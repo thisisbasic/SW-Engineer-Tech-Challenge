@@ -1,9 +1,11 @@
 import asyncio
 import json
 import logging
+import os
 import time
 
 import aiohttp
+from dotenv import load_dotenv
 from pydicom import Dataset
 from scp import ModalityStoreSCP
 
@@ -11,6 +13,10 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
+load_dotenv()
+
+REST_API_URL = os.getenv("REST_API_URL", "http://127.0.0.1:8000/series/")
 
 
 class SeriesCollector:
@@ -114,12 +120,8 @@ class SeriesDispatcher:
                     self.series_collector.series_instance_uid,
                     data["InstancesInSeries"],
                 )
-
-                print(f"Data sent: {data}")
                 data_json = json.dumps(data)
-                await self.send_post_request(
-                    "http://127.0.0.1:8000/series/", data=data_json
-                )
+                await self.send_post_request(REST_API_URL, data=data_json)
                 self.series_collector = None
 
     def collect_series_data(self) -> dict:
@@ -139,6 +141,8 @@ class SeriesDispatcher:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=json.loads(data)) as response:
                 await response.text()
+                if response.status == aiohttp.http.HTTPStatus.OK:
+                    logging.info("Data sent successfully %s", data)
                 return response
 
 
