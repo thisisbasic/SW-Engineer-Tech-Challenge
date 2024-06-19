@@ -13,3 +13,23 @@ If we update this document during the challenge, we will inform you about this s
 
 
 We wish you a lot of fun and success with the challenge 🚀
+
+### Run PACS
+```bash
+./run_pacs.sh
+```
+
+### Run Client
+```bash
+./run_client.sh
+```
+
+### Run FastAPI Server
+```bash
+./run_api.sh
+```
+
+
+
+## Sequence Diagram
+![SequenceDiagram.png](SequenceDiagram.png)
