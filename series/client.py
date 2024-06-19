@@ -89,5 +89,5 @@ if __name__ == "__main__":
     """Create a Series Dispatcher object and run it's infinite `main()` method in a event loop.
     """
     engine = SeriesDispatcher()
-    engine.loop = asyncio.get_event_loop()
+    engine.loop = asyncio.new_event_loop()
     engine.loop.run_until_complete(engine.main())

@@ -1,0 +1,2 @@
+-r base.txt
+pytest-asyncio==0.23.7
