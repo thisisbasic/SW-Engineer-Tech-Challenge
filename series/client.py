@@ -1,7 +1,14 @@
 import asyncio
+import json
+import logging
 import time
 from pydicom import Dataset
 from scp import ModalityStoreSCP
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 class SeriesCollector:
@@ -9,6 +16,7 @@ class SeriesCollector:
     It stores the (during collection incomplete) series, the Series (Instance) UID, the time the series was last updated
     with a new instance and the information whether the dispatch of the series was started.
     """
+
     def __init__(self, first_dataset: Dataset) -> None:
         """Initialization of the Series Collector with the first dataset (instance).
 
@@ -21,7 +29,7 @@ class SeriesCollector:
         self.dispatch_started = False
 
     def add_instance(self, dataset: Dataset) -> bool:
-        """Add an dataset to the series collected by this Series Collector if it has the correct Series UID.
+        """Add a dataset to the series collected by this Series Collector if it has the correct Series UID.
 
         Args:
             dataset (Dataset): The dataset to add.
@@ -46,48 +54,86 @@ class SeriesDispatcher:
     """
 
     def __init__(self) -> None:
-        """Initialize the Series Dispatcher.
-        """
+        """Initialize the Series Dispatcher."""
 
         self.loop: asyncio.AbstractEventLoop
         self.modality_scp = ModalityStoreSCP()
         self.series_collector = None
+        self.maximum_wait_time_before_dispatching_in_sec = 1
 
     async def main(self) -> None:
         """An infinitely running method used as hook for the asyncio event loop.
-        Keeps the event loop alive whether or not datasets are received from the modality and prints a message
-        regulary when no datasets are received.
+        Keeps the event loop alive whether datasets are received from the modality and prints a message
+        regular when no datasets are received.
         """
         while True:
-            # TODO: Regulary check if new datasets are received and act if they are.
             # Information about Python asyncio: https://docs.python.org/3/library/asyncio.html
             # When datasets are received you should collect and process them
             # (e.g. using `asyncio.create_task(self.run_series_collector()`)
-            
-            print("Waiting for Modality")
+            logging.info("Waiting for Modality")
+            await asyncio.create_task(self.run_series_collectors())
             await asyncio.sleep(0.2)
 
     async def run_series_collectors(self) -> None:
-        """Runs the collection of datasets, which results in the Series Collector being filled.
-        """
-        # TODO: Get the data from the SCP and start dispatching
-        pass
+        """Runs the collection of datasets, which results in the Series Collector being filled."""
+        try:
+            while not self.modality_scp.dataset_queue.empty():
+                dataset = self.modality_scp.dataset_queue.get()
+                if self.series_collector is None:
+                    self.series_collector = SeriesCollector(dataset)
+                elif not self.series_collector.add_instance(dataset):
+                    # not your turn. Patience you must have.
+                    self.modality_scp.dataset_queue.put(dataset)
+                    await self.dispatch_series_collector()
+            await self.dispatch_series_collector()
+        except Exception as e:
+            logging.error("Error in running series collector %s", e)
 
     async def dispatch_series_collector(self) -> None:
-        """Tries to dispatch a Series Collector, i.e. to finish it's dataset collection and scheduling of further
+        """Tries to dispatch a Series Collector, i.e. to finish its dataset collection and scheduling of further
         methods to extract the desired information.
         """
         # Check if the series collector hasn't had an update for a long enough timespan and send the series to the
         # server if it is complete
         # NOTE: This is the last given function, you should create more for extracting the information and
         # sending the data to the server
-        maximum_wait_time = 1
-        pass
+        if (
+            self.series_collector is not None
+            and not self.series_collector.dispatch_started
+        ):
+            time_now = time.time()
+            if (
+                time_now - self.series_collector.last_update_time
+            ) > self.maximum_wait_time_before_dispatching_in_sec:
+                self.series_collector.dispatch_started = True
+                data = self.collect_series_data()
+                logging.info(
+                    "Dispatching series %s with %d instances.",
+                    self.series_collector.series_instance_uid,
+                    data["InstancesInSeries"],
+                )
+
+                print(f"Data sent: {data}")
+                data_json = json.dumps(data)
+                # await self.send_post_request("http://0.0.0.0:8000/series/", data=data_json)
+                self.series_collector = None
+
+    def collect_series_data(self) -> dict:
+        """Collects information about the series."""
+        if not self.series_collector:
+            return {}
+
+        return {
+            "SeriesInstanceUID": self.series_collector.series_instance_uid,
+            "PatientName": str(self.series_collector.series[0].PatientName),
+            "PatientID": self.series_collector.series[0].PatientID,
+            "StudyInstanceUID": self.series_collector.series[0].StudyInstanceUID,
+            "InstancesInSeries": len(self.series_collector.series),
+        }
 
 
 if __name__ == "__main__":
-    """Create a Series Dispatcher object and run it's infinite `main()` method in a event loop.
-    """
+    """Create a Series Dispatcher object and run it's infinite `main()` method in a event loop."""
     engine = SeriesDispatcher()
     engine.loop = asyncio.new_event_loop()
     engine.loop.run_until_complete(engine.main())
