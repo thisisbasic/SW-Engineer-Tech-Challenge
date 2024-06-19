@@ -1,6 +1,5 @@
 import os
-from typing import List
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, String, Integer
 from sqlalchemy.ext.declarative import declarative_base
@@ -79,18 +78,18 @@ async def create_series_data(series_data: SeriesData, db: Session = Depends(get_
     return db_series_data
 
 
-@app.get("/series/", response_model=List[SeriesData])
-async def get_all_series_data(db: Session = Depends(get_db)):
-    return db.query(SeriesDB).all()
-
-
-@app.get("/series/{series_instance_uid}", response_model=SeriesData)
-async def get_series_data(series_instance_uid: str, db: Session = Depends(get_db)):
-    series_data = (
-        db.query(SeriesDB)
-        .filter(SeriesDB.SeriesInstanceUID == series_instance_uid)
-        .first()
-    )
-    if series_data is None:
-        raise HTTPException(status_code=404, detail="Series data not found")
-    return series_data
+# @app.get("/series/", response_model=List[SeriesData])
+# async def get_all_series_data(db: Session = Depends(get_db)):
+#     return db.query(SeriesDB).all()
+#
+#
+# @app.get("/series/{series_instance_uid}", response_model=SeriesData)
+# async def get_series_data(series_instance_uid: str, db: Session = Depends(get_db)):
+#     series_data = (
+#         db.query(SeriesDB)
+#         .filter(SeriesDB.SeriesInstanceUID == series_instance_uid)
+#         .first()
+#     )
+#     if series_data is None:
+#         raise HTTPException(status_code=404, detail="Series data not found")
+#     return series_data
