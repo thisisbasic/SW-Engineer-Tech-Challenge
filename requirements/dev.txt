@@ -1,3 +1,4 @@
 -r base.txt
 pytest-asyncio==0.23.7
 ruff==0.4.9
+black==24.4.2
