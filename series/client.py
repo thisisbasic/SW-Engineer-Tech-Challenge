@@ -17,6 +17,9 @@ logging.basicConfig(
 load_dotenv()
 
 REST_API_URL = os.getenv("REST_API_URL", "http://127.0.0.1:8000/series/")
+REFRESH_TIME_IN_SEC = int(os.getenv("REFRESH_TIME_IN_SEC", 0.2))
+AE_HOST = os.getenv("AE_HOST", "127.0.0.1")
+AE_PORT = int(os.getenv("AE_PORT", 6667))
 
 
 class SeriesCollector:
@@ -65,7 +68,7 @@ class SeriesDispatcher:
         """Initialize the Series Dispatcher."""
 
         self.loop: asyncio.AbstractEventLoop
-        self.modality_scp = ModalityStoreSCP()
+        self.modality_scp = ModalityStoreSCP(host=AE_HOST, port=AE_PORT)
         self.series_collector = None
         self.maximum_wait_time_before_dispatching_in_sec = 1
 
@@ -80,7 +83,7 @@ class SeriesDispatcher:
             # (e.g. using `asyncio.create_task(self.run_series_collector()`)
             # logging.info("Waiting for Modality")
             await asyncio.create_task(self.run_series_collectors())
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(REFRESH_TIME_IN_SEC)
 
     async def run_series_collectors(self) -> None:
         """Runs the collection of datasets, which results in the Series Collector being filled."""

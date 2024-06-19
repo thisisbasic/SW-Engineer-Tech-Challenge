@@ -34,7 +34,7 @@ class ModalityStoreSCP:
         self.scp = self.ae.start_server(
             (self.host, self.port), block=self.block, evt_handlers=handlers
         )
-        logging.info("SCP Server started")
+        logging.info("SCP Server started listening at %s:%s", self.host, self.port)
 
     @property
     def dataset_queue(self) -> Queue:
