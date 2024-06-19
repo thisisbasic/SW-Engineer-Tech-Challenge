@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import time
+
+import aiohttp
 from pydicom import Dataset
 from scp import ModalityStoreSCP
 
@@ -70,7 +72,7 @@ class SeriesDispatcher:
             # Information about Python asyncio: https://docs.python.org/3/library/asyncio.html
             # When datasets are received you should collect and process them
             # (e.g. using `asyncio.create_task(self.run_series_collector()`)
-            logging.info("Waiting for Modality")
+            # logging.info("Waiting for Modality")
             await asyncio.create_task(self.run_series_collectors())
             await asyncio.sleep(0.2)
 
@@ -115,7 +117,9 @@ class SeriesDispatcher:
 
                 print(f"Data sent: {data}")
                 data_json = json.dumps(data)
-                # await self.send_post_request("http://0.0.0.0:8000/series/", data=data_json)
+                await self.send_post_request(
+                    "http://127.0.0.1:8000/series/", data=data_json
+                )
                 self.series_collector = None
 
     def collect_series_data(self) -> dict:
@@ -130,6 +134,12 @@ class SeriesDispatcher:
             "StudyInstanceUID": self.series_collector.series[0].StudyInstanceUID,
             "InstancesInSeries": len(self.series_collector.series),
         }
+
+    async def send_post_request(self, url, data):
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=json.loads(data)) as response:
+                await response.text()
+                return response
 
 
 if __name__ == "__main__":
